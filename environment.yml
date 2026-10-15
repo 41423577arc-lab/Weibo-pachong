@@ -1,0 +1,10 @@
+name: identify_v
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - Scrapy==2.13.4
+      - python-dateutil>=2.9,<3
+      - PyMySQL[rsa]>=1.1,<2

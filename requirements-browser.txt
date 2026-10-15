@@ -1,0 +1,3 @@
+# Uses the already installed Chrome channel; no browser download is required.
+playwright>=1.49,<2
+PyMySQL>=1.1,<2
