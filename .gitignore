@@ -1,0 +1,55 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+local-secrets.json
+local-secrets.*.json
+!local-secrets.example.json
+cookie.txt
+cookies.txt
+cookies.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.log
+*.sql.gz
+*.dump
+.github/cookie.png
+/logs/
+/output/
+.browser-venv/
+browser-profile/
+user-data-dir/
+/publish/
+cookie.txt
+**/cookie.txt
+.github/cookie.png
+local-secrets.json
+**/local-secrets.json
+# Local credentials, browser profiles, and workflow artifacts
+credentials.json
+.secrets/
+.credentials/
+browser_profile/
+User Data/
+Cookies
+Login Data
+Local State
+*.sqlite*
+*.db-*
+*.bak
+*.zip
+state.json
+state.*.json
+checkpoint
+checkpoint/
+checkpoints/
+checkpoint.*
+*_checkpoint.*
