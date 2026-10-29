@@ -105,7 +105,7 @@ class Collector:
         config = read_config()
         self.db = pymysql.connect(host=config.get('WEIBO_DB_HOST') or '127.0.0.1',
             port=int(config.get('WEIBO_DB_PORT') or 3306), user=config['WEIBO_DB_USER'],
-            password=config['WEIBO_DB_PASSWORD'], database='weibo_data', charset='utf8mb4',
+            password=config['WEIBO_DB_PASSWORD'], database=config.get('WEIBO_DB_NAME', 'weibo_data'), charset='utf8mb4',
             connect_timeout=10, read_timeout=30, write_timeout=30, autocommit=True)
         self.session = requests.Session()
         # Keep the existing project request identity; do not rotate identities after denial.

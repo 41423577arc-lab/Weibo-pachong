@@ -93,7 +93,7 @@ def safe_search_next(url, previous):
 
 
 async def collect(args, job):
-    from playwright.async_api import async_playwright
+    from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
     checkpoint_path = args.output / "browser-tweets-state.json"
     if checkpoint_path.exists():
         state = json.loads(checkpoint_path.read_text(encoding="utf-8"))
@@ -106,7 +106,7 @@ async def collect(args, job):
     db = connect()
     records = read_records(db)
     saved_sids = {r["payload"].get("mblogid") for r in records if r["keyword"] == job["keyword"]
-                  and r["payload"].get("long_text_complete") is not False}
+                  and r["payload"].get("content")}
     known_bodies = {r["payload"].get("mblogid"): r["payload"] for r in records
                     if r["spider"].startswith("tweet") and r["payload"].get("content")
                     and r["payload"].get("long_text_complete") is not False}
@@ -116,7 +116,10 @@ async def collect(args, job):
     captured, response_status, handlers = {}, [], []
     navigated = 0
     collected = 0
-    incomplete_longtexts = []
+    incomplete_longtexts = sorted({r["item_id"] for r in records
+        if r["keyword"] == job["keyword"] and r["payload"].get("long_text_complete") is False
+        and job["start"] <= r["payload"].get("created_at", "") < job["end"]})
+    state['incomplete_longtexts'] = incomplete_longtexts
     reused = 0
 
     async def observe(response):
@@ -241,8 +244,11 @@ async def collect(args, job):
                             if raw.get("isLongText") and not longtext and not has_inline:
                                 expand = page.locator('main article').get_by_text(re.compile(r'^展开(?:全文)?$'))
                                 if await expand.count() == 1 and await expand.is_visible():
-                                    await expand.click(timeout=10000)
-                                    await page.wait_for_timeout(1500)
+                                    try:
+                                        await expand.click(timeout=10000)
+                                        await page.wait_for_timeout(1500)
+                                    except PlaywrightTimeoutError:
+                                        state['events'].append({'kind': 'longtext_expand_timeout', 'sid': sid})
                                     longtext = captured.get(("/ajax/statuses/longtext", sid)) or captured.get(("/ajax/statuses/longtext", numeric_id))
                             item = normalize_tweet(raw, job["keyword"], job["round_id"], longtext)
                             date_cache[sid] = item["created_at"]
@@ -256,8 +262,12 @@ async def collect(args, job):
                                 if item["_id"] not in state["saved_posts"]:
                                     state["saved_posts"].append(item["_id"])
                                 if not item["long_text_complete"]:
-                                    incomplete_longtexts.append(item["_id"])
-                                    raise BrowserAccessStopped("longtext_incomplete")
+                                    if item["_id"] not in incomplete_longtexts:
+                                        incomplete_longtexts.append(item["_id"])
+                                    state["events"].append({"kind": "longtext_incomplete_saved_and_skipped",
+                                                            "tweet_id": item["_id"]})
+                                if any(e["status"] in (401, 403, 418, 429) for e in response_status):
+                                    raise BrowserAccessStopped("post_page_access_limit")
                             else:
                                 state["events"].append({"kind": "outside_date_range", "tweet_id": item["_id"],
                                                         "created_at": item["created_at"]})
@@ -275,7 +285,7 @@ async def collect(args, job):
     finally:
         db.close()
         write_json(checkpoint_path, state)
-        result = {"complete": not state["queue"] and not state["stop_reason"] and not incomplete_longtexts,
+        result = {"complete": not state["queue"] and not state["stop_reason"],
             "stop_reason": state["stop_reason"], "saved_posts_this_attempt": collected,
             "saved_posts_checkpoint": len(state["saved_posts"]), "pending_tasks": len(state["queue"]),
             "normal_page_navigations": navigated, "coverage": "normal_browser_pages",
